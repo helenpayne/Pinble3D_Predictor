@@ -1,0 +1,53 @@
+name: Run Predictor
+
+on:
+  schedule:
+    - cron: '0 4 * * *'  # 每天北京时间中午12:00 运行
+  workflow_dispatch:     # 允许手动触发
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    env:
+      PYTHONIOENCODING: utf-8
+
+      # ✅ 微信提醒相关
+      WECHAT_API_KEY: ${{ secrets.WECHAT_API_KEY }}
+      WECHAT_TEMPLATE_ID: ${{ secrets.WECHAT_TEMPLATE_ID }}
+      WECHAT_API_URL: ${{ secrets.WECHAT_API_URL }}
+      WECHAT_TO_USERS: ${{ secrets.WECHAT_TO_USERS }}
+
+      # ✅ 采集器相关（可选）
+      PINBLE_BASE_URL: ${{ secrets.PINBLE_BASE_URL }}
+      PINBLE_REFERER: ${{ secrets.PINBLE_REFERER }}
+
+    steps:
+      - name: 拉取仓库代码
+        uses: actions/checkout@v3
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: 设置 Python 3.11
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: 安装依赖包
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: 执行预测主流程
+        run: python run_predict.py
+
+      - name: 配置 Git 身份
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: 提交数据与模型变更
+        run: |
+          git add data/ models/
+          git commit -m "🤖 自动提交：更新数据与模型 $(date '+%Y-%m-%d %H:%M:%S')" || echo "无变更可提交"
+          git push origin master
